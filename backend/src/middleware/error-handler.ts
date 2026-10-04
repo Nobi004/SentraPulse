@@ -12,8 +12,23 @@ export function errorHandler(
   const rid =
     (req as unknown as Record<string, string>).requestId ??
     (typeof fallbackId === "string" ? fallbackId : "req_unknown");
-  const status = err instanceof AppError ? err.statusCode : 500;
-  const code = err instanceof AppError ? err.code : "INTERNAL_ERROR";
+  const bodyParseError =
+    typeof err === "object" &&
+    err !== null &&
+    "status" in err &&
+    (err as { status: unknown }).status === 400 &&
+    "type" in err &&
+    typeof (err as { type: unknown }).type === "string" &&
+    ((err as { type: string }).type.startsWith("entity.") ||
+      (err as { type: string }).type === "entity.parse.failed");
+  const status =
+    err instanceof AppError ? err.statusCode : bodyParseError ? 400 : 500;
+  const code =
+    err instanceof AppError
+      ? err.code
+      : bodyParseError
+        ? "VALIDATION_ERROR"
+        : "INTERNAL_ERROR";
   const message = err instanceof Error ? err.message : "Unknown error";
 
   if (status === 500) {

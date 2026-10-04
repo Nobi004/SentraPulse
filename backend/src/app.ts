@@ -4,6 +4,7 @@ import cors from "cors";
 import { requestId } from "./middleware/request-id.js";
 import { notFound } from "./middleware/not-found.js";
 import { errorHandler } from "./middleware/error-handler.js";
+import { monitorRouter } from "./modules/monitoring/routes.js";
 
 export function createApp() {
   const app = express();
@@ -18,6 +19,9 @@ export function createApp() {
       data: { uptime: process.uptime(), db: "not-checked" },
     });
   });
+
+  app.use("/api/v1/monitor", monitorRouter);
+  app.use("/monitor", monitorRouter);
 
   app.use(notFound);
   app.use(errorHandler);

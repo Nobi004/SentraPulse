@@ -1,6 +1,8 @@
 import { detectAnomalies } from "../../domain/anomaly/anomaly-detector.js";
+import { buildSignature } from "../../domain/alert/signature.js";
 import { logger } from "../../config/logger.js";
 import { ValidationError } from "../../errors/app-error.js";
+import { recordAnomaly } from "../alerts/service.js";
 import { insertObservations } from "./observation.repository.js";
 import type { ObservationDoc } from "./observation.repository.js";
 import { getMaxBatchSize, monitorItemSchema, toNullNumber } from "./schema.js";
@@ -16,6 +18,8 @@ export interface AnomalyResultItem {
   severity: string;
   riskScore: number;
   types: string[];
+  alertId: string;
+  alertAction: "created" | "updated";
 }
 
 export interface RejectedResult {
@@ -58,6 +62,22 @@ export async function processBatch(rawBody: unknown): Promise<{
 
   const results: MonitorResultItem[] = [];
   const docs: ObservationDoc[] = [];
+  // Parallel context for valid items: result position + detection facts
+  // needed for the alert upsert once observation ids are known.
+  const pendingAlerts: {
+    resultPos: number;
+    apiName: string;
+    signature: string;
+    anomalyTypes: string[];
+    reasons: string[];
+    severity: string;
+    riskScore: number;
+    metrics: {
+      responseTimeMs: number | null;
+      statusCode: number | null;
+      recordsReturned: number | null;
+    };
+  }[] = [];
   let healthy = 0;
   let anomalies = 0;
   let rejected = 0;
@@ -112,12 +132,24 @@ export async function processBatch(rawBody: unknown): Promise<{
         severity: detection.severity,
         types: detection.types,
       });
+      pendingAlerts.push({
+        resultPos: results.length,
+        apiName: parsed.data.api_name,
+        signature: buildSignature(parsed.data.api_name, [...detection.types]),
+        anomalyTypes: [...detection.types],
+        reasons: [...detection.reasons],
+        severity: detection.severity,
+        riskScore: detection.riskScore,
+        metrics: { responseTimeMs, statusCode, recordsReturned },
+      });
       results.push({
         apiName: parsed.data.api_name,
         status: "anomaly",
         severity: detection.severity,
         riskScore: detection.riskScore,
         types: [...detection.types],
+        alertId: "",
+        alertAction: "created",
       });
     } else {
       healthy += 1;
@@ -125,9 +157,26 @@ export async function processBatch(rawBody: unknown): Promise<{
     }
   });
 
+  let insertedIds: { _id: unknown }[] = [];
   if (docs.length > 0) {
-    await insertObservations(docs);
+    insertedIds = await insertObservations(docs);
     logger.info("OBSERVATIONS_STORED", { count: docs.length });
+  }
+
+  // Alert upsert in input order: insertMany preserves order so
+  // insertedIds[i] belongs to the i-th valid item.
+  for (let i = 0; i < pendingAlerts.length; i++) {
+    const pending = pendingAlerts[i]!;
+    const observationId = String(insertedIds[i]?._id ?? "");
+    const { alertId, alertAction } = await recordAnomaly({
+      ...pending,
+      observationId,
+    });
+    const item = results[pending.resultPos];
+    if (item && item.status === "anomaly") {
+      item.alertId = alertId;
+      item.alertAction = alertAction;
+    }
   }
 
   return {

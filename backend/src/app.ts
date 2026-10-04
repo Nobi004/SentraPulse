@@ -5,6 +5,7 @@ import { requestId } from "./middleware/request-id.js";
 import { notFound } from "./middleware/not-found.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { monitorRouter } from "./modules/monitoring/routes.js";
+import { alertsRouter } from "./modules/alerts/routes.js";
 
 export function createApp() {
   const app = express();
@@ -22,6 +23,8 @@ export function createApp() {
 
   app.use("/api/v1/monitor", monitorRouter);
   app.use("/monitor", monitorRouter);
+  app.use("/api/v1/alerts", alertsRouter);
+  app.use("/alerts", alertsRouter);
 
   app.use(notFound);
   app.use(errorHandler);

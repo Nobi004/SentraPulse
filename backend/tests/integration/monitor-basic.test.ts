@@ -33,7 +33,7 @@ describe("POST /api/v1/monitor basics", () => {
     });
   });
 
-  it("POST single anomaly (no alert fields yet in 3a)", async () => {
+  it("POST single anomaly returns alertId (3b: dedupe upsert)", async () => {
     const r = await request(app)
       .post("/api/v1/monitor")
       .send({
@@ -48,8 +48,9 @@ describe("POST /api/v1/monitor basics", () => {
       apiName: "AppointmentAPI",
       status: "anomaly",
       severity: "critical",
+      alertAction: "created",
     });
-    expect(r.body.results[0]).not.toHaveProperty("alertId");
+    expect(r.body.results[0].alertId).toEqual(expect.any(String));
   });
 
   it("batch continues past per-item reject", async () => {

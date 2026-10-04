@@ -1,0 +1,44 @@
+services:
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "4000:4000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      MONGODB_URI: mongodb://mongo:27017/api-monitor
+      CORS_ORIGIN: http://localhost:5173
+      LOG_LEVEL: info
+      HIGH_RESPONSE_TIME_MS: 5000
+      VERY_HIGH_RESPONSE_TIME_MS: 10000
+      MAX_BATCH_SIZE: 100
+      OBSERVATION_TTL_DAYS: 30
+      LLM_PROVIDER: none
+      LLM_TIMEOUT_MS: 5000
+      LLM_CONCURRENCY: 5
+      LLM_MAX_PER_REQUEST: 10
+      SIMULATOR_ENABLED: "true"
+      SIMULATOR_INTERVAL_MS: 15000
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo-data: {}

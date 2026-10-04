@@ -1,9 +1,20 @@
 import { detectAnomalies } from "../../domain/anomaly/anomaly-detector.js";
 import { buildSignature } from "../../domain/alert/signature.js";
+import type {
+  AlertGenerationInput,
+  AlertGenerator,
+} from "../../domain/alert/alert-generator.js";
+import { env } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
 import { ValidationError } from "../../errors/app-error.js";
+import { createAlertGenerator } from "../../ai/create-generator.js";
+import { GEMINI_MODEL } from "../../ai/gemini-alert-generator.js";
+import { PROMPT_VERSION } from "../../ai/prompts.js";
+import { validateOutput } from "../../ai/output-validator.js";
+import pLimit from "p-limit";
 import { recordAnomaly, autoResolveApi } from "../alerts/service.js";
-import { insertObservations } from "./observation.repository.js";
+import { Alert } from "../alerts/alert.model.js";
+import { insertObservations, getBaseline } from "./observation.repository.js";
 import type { ObservationDoc } from "./observation.repository.js";
 import { getMaxBatchSize, monitorItemSchema, toNullNumber } from "./schema.js";
 
@@ -42,7 +53,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export async function processBatch(rawBody: unknown): Promise<{
+export async function processBatch(
+  rawBody: unknown,
+  opts?: { generator?: AlertGenerator | null },
+): Promise<{
   summary: MonitorSummary;
   results: MonitorResultItem[];
 }> {
@@ -173,6 +187,7 @@ export async function processBatch(rawBody: unknown): Promise<{
   // Alert upserts + auto-resolves in input order: insertMany preserves
   // order so insertedIds[i] belongs to the i-th valid item, and steps
   // are pushed in the same order docs are pushed.
+  const newAlerts: { alertId: string; input: AlertGenerationInput }[] = [];
   let validCursor = 0;
   for (const step of steps) {
     const observationId = String(insertedIds[validCursor]?._id ?? "");
@@ -193,10 +208,61 @@ export async function processBatch(rawBody: unknown): Promise<{
         item.alertId = alertId;
         item.alertAction = alertAction;
       }
+      if (alertAction === "created") {
+        newAlerts.push({
+          alertId,
+          input: {
+            apiName: step.apiName,
+            severity: step.severity,
+            anomalyTypes: step.anomalyTypes,
+            reasons: step.reasons,
+            metrics: step.metrics,
+          },
+        });
+      }
       await autoResolveApi(step.apiName, step.signature);
     } else {
       await autoResolveApi(step.apiName, null);
     }
+  }
+
+  // LLM explanations for NEW alerts only: bounded count + concurrency,
+  // per-alert try/catch so an AI failure never fails the request.
+  const generator =
+    opts && "generator" in opts ? opts.generator : createAlertGenerator();
+  if (generator && newAlerts.length > 0) {
+    const batch = newAlerts.slice(0, env.LLM_MAX_PER_REQUEST);
+    const limit = pLimit(env.LLM_CONCURRENCY);
+    await Promise.all(
+      batch.map((entry) =>
+        limit(async () => {
+          try {
+            const context = await getBaseline(entry.input.apiName);
+            const text = await generator.generate({ ...entry.input, context });
+            if (!validateOutput(text, entry.input))
+              throw new Error("INVALID_OUTPUT");
+            await Alert.updateOne(
+              { _id: entry.alertId },
+              {
+                message: text,
+                messageSource: "ai",
+                model: GEMINI_MODEL,
+                promptVersion: PROMPT_VERSION,
+              },
+            );
+            logger.info("AI_ALERT_GENERATED", { alertId: entry.alertId });
+          } catch (err) {
+            const reason = err instanceof Error ? err.message : String(err);
+            logger.warn(
+              reason === "INVALID_OUTPUT"
+                ? "FALLBACK_ALERT_USED"
+                : "AI_PROVIDER_ERROR",
+              { alertId: entry.alertId, reason },
+            );
+          }
+        }),
+      ),
+    );
   }
 
   return {

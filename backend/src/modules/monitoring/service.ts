@@ -2,7 +2,7 @@ import { detectAnomalies } from "../../domain/anomaly/anomaly-detector.js";
 import { buildSignature } from "../../domain/alert/signature.js";
 import { logger } from "../../config/logger.js";
 import { ValidationError } from "../../errors/app-error.js";
-import { recordAnomaly } from "../alerts/service.js";
+import { recordAnomaly, autoResolveApi } from "../alerts/service.js";
 import { insertObservations } from "./observation.repository.js";
 import type { ObservationDoc } from "./observation.repository.js";
 import { getMaxBatchSize, monitorItemSchema, toNullNumber } from "./schema.js";
@@ -62,22 +62,27 @@ export async function processBatch(rawBody: unknown): Promise<{
 
   const results: MonitorResultItem[] = [];
   const docs: ObservationDoc[] = [];
-  // Parallel context for valid items: result position + detection facts
-  // needed for the alert upsert once observation ids are known.
-  const pendingAlerts: {
-    resultPos: number;
-    apiName: string;
-    signature: string;
-    anomalyTypes: string[];
-    reasons: string[];
-    severity: string;
-    riskScore: number;
-    metrics: {
-      responseTimeMs: number | null;
-      statusCode: number | null;
-      recordsReturned: number | null;
-    };
-  }[] = [];
+  // Ordered per-item steps for valid items: alert upserts and auto-resolves
+  // must run in input order so mixed batches (e.g. [bad-A, healthy-A])
+  // end in the state the last item dictates.
+  const steps: (
+    | {
+        kind: "anomaly";
+        resultPos: number;
+        apiName: string;
+        signature: string;
+        anomalyTypes: string[];
+        reasons: string[];
+        severity: string;
+        riskScore: number;
+        metrics: {
+          responseTimeMs: number | null;
+          statusCode: number | null;
+          recordsReturned: number | null;
+        };
+      }
+    | { kind: "healthy"; apiName: string }
+  )[] = [];
   let healthy = 0;
   let anomalies = 0;
   let rejected = 0;
@@ -132,7 +137,8 @@ export async function processBatch(rawBody: unknown): Promise<{
         severity: detection.severity,
         types: detection.types,
       });
-      pendingAlerts.push({
+      steps.push({
+        kind: "anomaly",
         resultPos: results.length,
         apiName: parsed.data.api_name,
         signature: buildSignature(parsed.data.api_name, [...detection.types]),
@@ -153,6 +159,7 @@ export async function processBatch(rawBody: unknown): Promise<{
       });
     } else {
       healthy += 1;
+      steps.push({ kind: "healthy", apiName: parsed.data.api_name });
       results.push({ apiName: parsed.data.api_name, status: "healthy" });
     }
   });
@@ -163,19 +170,32 @@ export async function processBatch(rawBody: unknown): Promise<{
     logger.info("OBSERVATIONS_STORED", { count: docs.length });
   }
 
-  // Alert upsert in input order: insertMany preserves order so
-  // insertedIds[i] belongs to the i-th valid item.
-  for (let i = 0; i < pendingAlerts.length; i++) {
-    const pending = pendingAlerts[i]!;
-    const observationId = String(insertedIds[i]?._id ?? "");
-    const { alertId, alertAction } = await recordAnomaly({
-      ...pending,
-      observationId,
-    });
-    const item = results[pending.resultPos];
-    if (item && item.status === "anomaly") {
-      item.alertId = alertId;
-      item.alertAction = alertAction;
+  // Alert upserts + auto-resolves in input order: insertMany preserves
+  // order so insertedIds[i] belongs to the i-th valid item, and steps
+  // are pushed in the same order docs are pushed.
+  let validCursor = 0;
+  for (const step of steps) {
+    const observationId = String(insertedIds[validCursor]?._id ?? "");
+    validCursor += 1;
+    if (step.kind === "anomaly") {
+      const { alertId, alertAction } = await recordAnomaly({
+        apiName: step.apiName,
+        signature: step.signature,
+        anomalyTypes: step.anomalyTypes,
+        reasons: step.reasons,
+        severity: step.severity,
+        riskScore: step.riskScore,
+        metrics: step.metrics,
+        observationId,
+      });
+      const item = results[step.resultPos];
+      if (item && item.status === "anomaly") {
+        item.alertId = alertId;
+        item.alertAction = alertAction;
+      }
+      await autoResolveApi(step.apiName, step.signature);
+    } else {
+      await autoResolveApi(step.apiName, null);
     }
   }
 

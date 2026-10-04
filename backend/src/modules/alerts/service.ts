@@ -96,3 +96,18 @@ export async function resolveAlert(id: string): Promise<unknown> {
   logger.info("ALERT_RESOLVED", { alertId: id });
   return alert.toObject();
 }
+
+export async function autoResolveApi(
+  apiName: string,
+  currentSignature: string | null,
+): Promise<number> {
+  const filter: Record<string, unknown> = { apiName, status: "active" };
+  if (currentSignature !== null) filter.signature = { $ne: currentSignature };
+  const result = await Alert.updateMany(filter, {
+    $set: { status: "resolved", resolvedBy: "auto", resolvedAt: new Date() },
+  });
+  const count =
+    typeof result.modifiedCount === "number" ? result.modifiedCount : 0;
+  if (count > 0) logger.info("ALERT_AUTO_RESOLVED", { apiName, count });
+  return count;
+}

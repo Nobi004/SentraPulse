@@ -17,7 +17,7 @@ const schema = z.object({
   LLM_CONCURRENCY: z.coerce.number().default(5),
   LLM_MAX_PER_REQUEST: z.coerce.number().default(10),
   INGEST_API_KEY: z.string().default(""),
-  SIMULATOR_ENABLED: z.string().default("true"),
+  SIMULATOR_ENABLED: z.string().default("false"),
   SIMULATOR_INTERVAL_MS: z.coerce.number().default(15000),
 });
 

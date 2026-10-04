@@ -106,13 +106,20 @@ export async function tickOnce(
 }
 
 let started = false;
+let timer: NodeJS.Timeout | undefined;
 
 export function startSimulator(): void {
   if (env.SIMULATOR_ENABLED !== "true" || started) return;
   started = true;
-  setInterval(() => {
+  timer = setInterval(() => {
     tickOnce().catch((err: unknown) =>
       logger.error("SIMULATOR_ERROR", { message: String(err) }),
     );
   }, env.SIMULATOR_INTERVAL_MS);
+}
+
+export function stopSimulator(): void {
+  if (timer) clearInterval(timer);
+  timer = undefined;
+  started = false;
 }

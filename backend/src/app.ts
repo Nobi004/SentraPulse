@@ -6,6 +6,9 @@ import { notFound } from "./middleware/not-found.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { monitorRouter } from "./modules/monitoring/routes.js";
 import { alertsRouter } from "./modules/alerts/routes.js";
+import { statsRouter } from "./modules/stats/routes.js";
+import { createMonitorLimiter } from "./middleware/rate-limit.js";
+import { apiKey } from "./middleware/api-key.js";
 
 export function createApp() {
   const app = express();
@@ -21,10 +24,14 @@ export function createApp() {
     });
   });
 
-  app.use("/api/v1/monitor", monitorRouter);
-  app.use("/monitor", monitorRouter);
+  const monitorLimiter = createMonitorLimiter();
+
+  app.use("/api/v1/monitor", monitorLimiter, apiKey, monitorRouter);
+  app.use("/monitor", monitorLimiter, apiKey, monitorRouter);
   app.use("/api/v1/alerts", alertsRouter);
   app.use("/alerts", alertsRouter);
+  app.use("/api/v1/stats", statsRouter);
+  app.use("/stats", statsRouter);
 
   app.use(notFound);
   app.use(errorHandler);

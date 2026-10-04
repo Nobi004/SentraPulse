@@ -17,14 +17,16 @@ export function DashboardPage() {
   const { data, error, loading, refresh } = useAlerts(filters);
   const stats = useStats();
   const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [resolveError, setResolveError] = useState<string | null>(null);
 
   const handleResolve = async (id: string) => {
     setResolvingId(id);
+    setResolveError(null);
     try {
       await resolveAlert(id);
       refresh();
-    } catch {
-      // list error surface covers it on next poll; keep quiet here
+    } catch (e) {
+      setResolveError(`Resolve failed: ${(e as Error).message}`);
     } finally {
       setResolvingId(null);
     }
@@ -46,6 +48,22 @@ export function DashboardPage() {
       ) : null}
 
       <AlertFilters filters={filters} onChange={setFilters} />
+
+      {resolveError ? (
+        <div
+          role="alert"
+          className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800"
+        >
+          <span>{resolveError}</span>
+          <button
+            type="button"
+            onClick={() => setResolveError(null)}
+            className="ml-3 rounded border border-red-300 px-2 py-0.5"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       {loading ? (
         <Spinner />

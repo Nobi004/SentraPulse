@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { AlertTable } from "./AlertTable.js";
 import type { AlertDto } from "../../types/api.js";
 
@@ -31,6 +31,7 @@ const sample: AlertDto[] = [
 ];
 
 describe("AlertTable", () => {
+  afterEach(cleanup);
   it("renders rows with badges, nulls as dashes, resolve only for active", () => {
     const onResolve = vi.fn();
     render(

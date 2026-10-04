@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { AlertFilters } from "./AlertFilters.js";
 
 describe("AlertFilters", () => {
+  afterEach(cleanup);
   it("emits updated filters (severity/status/apiName), status defaults active", () => {
     const onChange = vi.fn();
     render(

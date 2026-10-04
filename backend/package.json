@@ -10,8 +10,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "vitest run",
-    "lint": "eslint src tests",
-    "format": "prettier --check src tests"
+    "lint": "eslint src tests scripts",
+    "ingest": "tsx scripts/ingest.ts",
+    "format": "prettier --check src tests scripts"
   },
   "keywords": [],
   "author": "",

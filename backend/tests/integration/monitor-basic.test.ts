@@ -78,6 +78,29 @@ describe("POST /api/v1/monitor basics", () => {
     });
   });
 
+  it("rejected reasons distinguish missing vs invalid api_name", async () => {
+    const r = await request(app)
+      .post("/api/v1/monitor")
+      .send([
+        { response_time_ms: 100, status_code: 200, records_returned: 1 },
+        {
+          api_name: 42,
+          response_time_ms: 100,
+          status_code: 200,
+          records_returned: 1,
+        },
+      ])
+      .expect(200);
+    expect(r.body.results[0]).toMatchObject({
+      status: "rejected",
+      reason: "api_name is required",
+    });
+    expect(r.body.results[1]).toMatchObject({
+      status: "rejected",
+      reason: "api_name is invalid",
+    });
+  });
+
   it("400 on empty array and non-object body", async () => {
     await request(app).post("/api/v1/monitor").send([]).expect(400);
     await request(app)

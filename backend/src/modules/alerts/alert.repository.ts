@@ -65,3 +65,26 @@ export async function upsertAlert(
     throw err;
   }
 }
+
+export interface AlertMessagePatch {
+  message: string;
+  model: string;
+  promptVersion: string;
+}
+
+// Sole write path for LLM explanations: monitoring never touches the
+// Alert model directly (dependency rule: services → repositories).
+export async function updateAlertMessage(
+  alertId: string,
+  patch: AlertMessagePatch,
+): Promise<void> {
+  await Alert.updateOne(
+    { _id: alertId },
+    {
+      message: patch.message,
+      messageSource: "ai",
+      model: patch.model,
+      promptVersion: patch.promptVersion,
+    },
+  );
+}

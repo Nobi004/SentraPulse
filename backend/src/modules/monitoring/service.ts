@@ -13,7 +13,7 @@ import { PROMPT_VERSION } from "../../ai/prompts.js";
 import { validateOutput } from "../../ai/output-validator.js";
 import pLimit from "p-limit";
 import { recordAnomaly, autoResolveApi } from "../alerts/service.js";
-import { Alert } from "../alerts/alert.model.js";
+import { updateAlertMessage } from "../alerts/alert.repository.js";
 import { insertObservations, getBaseline } from "./observation.repository.js";
 import type { ObservationDoc } from "./observation.repository.js";
 import { getMaxBatchSize, monitorItemSchema, toNullNumber } from "./schema.js";
@@ -106,9 +106,7 @@ export async function processBatch(
     if (!parsed.success) {
       rejected += 1;
       const reason =
-        isRecord(raw) &&
-        typeof raw["api_name"] === "string" &&
-        raw["api_name"].length > 0
+        isRecord(raw) && "api_name" in raw
           ? "api_name is invalid"
           : "api_name is required";
       results.push({ index, status: "rejected", reason });
@@ -241,15 +239,11 @@ export async function processBatch(
             const text = await generator.generate({ ...entry.input, context });
             if (!validateOutput(text, entry.input))
               throw new Error("INVALID_OUTPUT");
-            await Alert.updateOne(
-              { _id: entry.alertId },
-              {
-                message: text,
-                messageSource: "ai",
-                model: GEMINI_MODEL,
-                promptVersion: PROMPT_VERSION,
-              },
-            );
+            await updateAlertMessage(entry.alertId, {
+              message: text,
+              model: GEMINI_MODEL,
+              promptVersion: PROMPT_VERSION,
+            });
             logger.info("AI_ALERT_GENERATED", { alertId: entry.alertId });
           } catch (err) {
             const reason = err instanceof Error ? err.message : String(err);

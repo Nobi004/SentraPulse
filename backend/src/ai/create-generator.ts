@@ -1,4 +1,5 @@
 import { env } from "../config/env.js";
+import { logger } from "../config/logger.js";
 import type { AlertGenerator } from "../domain/alert/alert-generator.js";
 import {
   createGeminiGenerator,
@@ -15,5 +16,6 @@ export function createAlertGenerator(): AlertGenerator | null {
       env.LLM_TIMEOUT_MS,
     );
   }
+  logger.warn("LLM_PROVIDER_NOT_IMPLEMENTED", { provider: env.LLM_PROVIDER });
   return null;
 }

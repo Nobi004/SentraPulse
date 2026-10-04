@@ -113,4 +113,20 @@ describe("LLM explanations (mocked generator)", () => {
     expect(mod.createAlertGenerator()).toBeNull();
     vi.unstubAllEnvs();
   });
+
+  it("factory warns and falls back for the unimplemented openai provider", async () => {
+    vi.resetModules();
+    vi.stubEnv("LLM_PROVIDER", "openai");
+    vi.stubEnv("OPENAI_API_KEY", "sk-test");
+    const { logger } = await import("../../src/config/logger.js");
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => logger);
+    const mod = await import("../../src/ai/create-generator.js");
+    expect(mod.createAlertGenerator()).toBeNull();
+    expect(warn).toHaveBeenCalledWith(
+      "LLM_PROVIDER_NOT_IMPLEMENTED",
+      expect.objectContaining({ provider: "openai" }),
+    );
+    warn.mockRestore();
+    vi.unstubAllEnvs();
+  });
 });

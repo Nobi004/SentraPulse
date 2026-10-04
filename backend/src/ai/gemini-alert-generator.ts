@@ -2,7 +2,7 @@ import type { AlertGenerator } from "../domain/alert/alert-generator.js";
 import { buildPrompt } from "./prompts.js";
 import { validateOutput } from "./output-validator.js";
 
-export const GEMINI_MODEL = "gemini-1.5-flash";
+export const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 export function createGeminiGenerator(
   apiKey: string,
@@ -23,7 +23,12 @@ export function createGeminiGenerator(
           }),
         },
       );
-      if (!response.ok) throw new Error(`GEMINI_${response.status}`);
+      if (!response.ok) {
+        // Body excerpt only — the key travels in the query string, which is
+        // never included, so this is safe to log.
+        const detail = await response.text().catch(() => "");
+        throw new Error(`GEMINI_${response.status}: ${detail.slice(0, 300)}`);
+      }
       const data = (await response.json()) as {
         candidates?: { content?: { parts?: { text?: string }[] } }[];
       };

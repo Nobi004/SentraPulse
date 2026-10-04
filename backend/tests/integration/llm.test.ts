@@ -9,6 +9,7 @@ import {
 } from "vitest";
 import { startTestDB, stopTestDB, clearDB } from "../helpers/db.js";
 import { processBatch } from "../../src/modules/monitoring/service.js";
+import { GEMINI_MODEL } from "../../src/ai/gemini-alert-generator.js";
 import { Alert } from "../../src/modules/alerts/alert.model.js";
 import type {
   AlertGenerationInput,
@@ -48,7 +49,7 @@ describe("LLM explanations (mocked generator)", () => {
     const alert = await Alert.findOne({ apiName: "AppointmentAPI" }).lean();
     expect(alert).toMatchObject({
       messageSource: "ai",
-      model: "gemini-1.5-flash",
+      model: GEMINI_MODEL,
       promptVersion: "v1",
     });
     expect(alert?.message).toContain("AppointmentAPI");

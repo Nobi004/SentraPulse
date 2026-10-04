@@ -6,12 +6,12 @@
 
 **Architecture:** `routes → controllers → services → (domain | repositories | ai)`. `domain/` pure (no Express/Mongoose/LLM). Detection in-memory + `insertMany`; LLM only for NEW incidents, blocking response with `p-limit` concurrency + `AbortSignal.timeout`, output validation, fallback. Partial unique index enforces one active alert per signature.
 
-**Tech Stack:** Node.js 20+, Express 4, TypeScript 5 (nodenext strict), Mongoose 8, Zod 3, Winston 3, MongoDB 7, React 18 + Vite 5 + TypeScript + Tailwind 3 (plain `fetch`), Gemini `gemini-1.5-flash` via REST `fetch` (no SDK) behind `AlertGenerator`, `p-limit@5`, Vitest 2 + Supertest + mongodb-memory-server 9, Docker Compose, ESLint 9 + Prettier 3, `setInterval` scheduler.
+**Tech Stack:** Node.js 20+, Express 4, TypeScript 5 (nodenext strict), Mongoose 8, Zod 3, Winston 3, MongoDB 7, React 18 + Vite 5 + TypeScript + Tailwind 3 (plain `fetch`), Gemini `gemini-3.5-flash-lite` via REST `fetch` (no SDK) behind `AlertGenerator`, `p-limit@5`, Vitest 2 + Supertest + mongodb-memory-server 9, Docker Compose, ESLint 9 + Prettier 3, `setInterval` scheduler.
 
 **Spec:** `docs/architecture.md` (v2, 27 sections)
 
 **Key Senior Decisions (locked):**
-- **LLM provider: Gemini** (`gemini-1.5-flash`, REST fetch). Reason: free-tier key, simple REST, no SDK bloat. OpenAI swap = new file `openai-alert-generator.ts` + 1 line in factory.
+- **LLM provider: Gemini** (`gemini-3.5-flash-lite`, REST fetch). Reason: free-tier key, simple REST, no SDK bloat. OpenAI swap = new file `openai-alert-generator.ts` + 1 line in factory.
 - **LLM blocks response (spec §10 compliant) with budget:** `LLM_TIMEOUT_MS=5000`, `LLM_CONCURRENCY=5`, `LLM_MAX_PER_REQUEST=10` → worst-case added latency ~10s (2 batches × 5s) for 10 new incidents; typical 1-2 incidents ~1-3s. Mitigation: only NEW alerts call LLM, timeout aborts, failures keep fallback and still 200. Future (out of scope): move to fire-and-forget background patch.
 - **Walking skeleton first:** Task 3a ships `POST /monitor → GET /alerts` end-to-end before indexes/AI, to de-risk contract.
 
@@ -562,7 +562,7 @@ export function validateOutput(t:string,i:AlertGenerationInput):boolean{
   return true;
 }
 // ai/gemini-alert-generator.ts – REST, timeout via AbortSignal.timeout
-export function createGeminiGenerator(apiKey:string,model='gemini-1.5-flash',timeoutMs=5000):AlertGenerator{
+export function createGeminiGenerator(apiKey:string,model='gemini-3.5-flash-lite',timeoutMs=5000):AlertGenerator{
   return { async generate(input){
     const ctrl=AbortSignal.timeout(timeoutMs);
     const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -577,7 +577,7 @@ export function createGeminiGenerator(apiKey:string,model='gemini-1.5-flash',tim
 import { env } from '../config/env.js';
 import { createGeminiGenerator } from './gemini-alert-generator.js';
 export function createAlertGenerator(){ if(env.LLM_PROVIDER==='none'||!env.GEMINI_API_KEY) return null;
-  return createGeminiGenerator(env.GEMINI_API_KEY,'gemini-1.5-flash',env.LLM_TIMEOUT_MS); }
+  return createGeminiGenerator(env.GEMINI_API_KEY,'gemini-3.5-flash-lite',env.LLM_TIMEOUT_MS); }
 ```
 
 Wiring in `monitoring/service.ts` (NEW alerts only):
@@ -591,7 +591,7 @@ await Promise.all(fresh.map(a=>limit(async()=>{
   try{
     const ctx=await getBaselineContext(a.apiName, a._id); // find apiName sort observedAt desc limit 20 → median + anomalyCount
     const text=await gen!.generate({...a, context:ctx});
-    await Alert.updateOne({_id:a._id},{message:text,messageSource:'ai',model:'gemini-1.5-flash',promptVersion:PROMPT_VERSION});
+    await Alert.updateOne({_id:a._id},{message:text,messageSource:'ai',model:'gemini-3.5-flash-lite',promptVersion:PROMPT_VERSION});
     logger.info('AI_ALERT_GENERATED',{alertId:a._id});
   }catch(e:any){ logger.warn(e.message==='INVALID_OUTPUT'?'FALLBACK_ALERT_USED':'AI_PROVIDER_ERROR',{alertId:a._id, reason:e.message}); }
 })));

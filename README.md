@@ -21,6 +21,22 @@ docker compose up --build
 - `LLM_PROVIDER=none` by default — full system runs with no API key.
 - The simulator (`SIMULATOR_ENABLED=true`) generates traffic so alerts appear.
 
+## Secrets (`.env`, gitignored)
+
+One line still runs everything. Secrets live in the root `.env`
+(never committed — see `.gitignore`); missing file = defaults above.
+
+```bash
+# enable live AI explanations (free key: https://aistudio.google.com/apikey)
+# edit .env: LLM_PROVIDER=gemini, GEMINI_API_KEY=<key>
+docker compose up --build -d
+```
+
+```bash
+# optional: lock down ingest with a shared secret
+# edit .env: INGEST_API_KEY=<secret>  →  POST /monitor needs header x-api-key
+```
+
 ## Local development
 
 Requirements: Node.js >= 20. MongoDB via Docker:

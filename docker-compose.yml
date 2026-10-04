@@ -16,6 +16,11 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+    # Root .env is picked up automatically when present (see .env.example);
+    # required:false + :-defaults keep `docker compose up` zero-setup.
+    env_file:
+      - path: .env
+        required: false
     environment:
       NODE_ENV: production
       PORT: 4000
@@ -26,11 +31,13 @@ services:
       VERY_HIGH_RESPONSE_TIME_MS: 10000
       MAX_BATCH_SIZE: 100
       OBSERVATION_TTL_DAYS: 30
-      LLM_PROVIDER: none
+      LLM_PROVIDER: ${LLM_PROVIDER:-none}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      INGEST_API_KEY: ${INGEST_API_KEY:-}
       LLM_TIMEOUT_MS: 5000
       LLM_CONCURRENCY: 5
       LLM_MAX_PER_REQUEST: 10
-      SIMULATOR_ENABLED: "true"
+      SIMULATOR_ENABLED: ${SIMULATOR_ENABLED:-true}
       SIMULATOR_INTERVAL_MS: 15000
 
   frontend:

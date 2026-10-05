@@ -1,4 +1,4 @@
-# Intelligent API Monitoring & Alert System — Architecture (v2)
+# SentraPulse System Architecture
 
 ## 1. Overview
 
@@ -10,7 +10,7 @@ Core principle:
 
 > **Detection is deterministic. The LLM only explains. Monitoring must stay correct when the LLM is unavailable or wrong.**
 
-Scope is deliberately sized for a 5-day assessment. Anything beyond the brief is either small and high-leverage, or listed under *Known Limitations* (section 22).
+The initial architecture favors a modular monolith with bounded operational complexity, keeping the system simple to deploy while preserving clear domain boundaries. Anything beyond that is either small and high-leverage, or listed under *Known Limitations* (section 22).
 
 ---
 
@@ -109,13 +109,12 @@ backend/
 │   │   ├── monitoring/    routes · controller · service · schema.ts · observation.model.ts · observation.repository.ts
 │   │   ├── alerts/        routes · controller · service · alert.model.ts · alert.repository.ts
 │   │   └── stats/         routes · controller · service
-│   ├── ai/                create-generator.ts · <provider>-alert-generator.ts · prompts.ts · output-validator.ts
-│   ├── notifications/     email.service.ts            (optional, section 17)
+│   ├── ai/                create-generator.ts · gemini-alert-generator.ts · prompts.ts · output-validator.ts
 │   ├── scheduler/         simulator.ts
 │   ├── middleware/        request-id · error-handler · not-found · rate-limit · api-key
 │   └── errors/            app-error.ts
 ├── scripts/               ingest.ts
-├── data/                  sample-api-responses.json   (the example from the brief)
+├── data/                  sample-api-responses.json   (reference telemetry sample)
 ├── tests/                 unit/ · integration/
 └── package.json
 ```
@@ -390,7 +389,7 @@ The partial unique index is what makes deduplication safe, including when the sa
 
 ## 13. REST API
 
-The same routers are mounted at `/api/v1` and at `/` so the paths in the brief (`/monitor`, `/alerts`) work as written.
+The same routers are mounted at `/api/v1` and at `/` so the documented compatibility paths (`/monitor`, `/alerts`) work as written.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -442,7 +441,7 @@ AI_ALERT_GENERATED · AI_PROVIDER_ERROR · FALLBACK_ALERT_USED · DATABASE_ERROR
 
 ## 16. Automatic Monitoring and Data Sources
 
-The brief asks for automatic monitoring and allows static JSON input, so the system does not depend on someone manually POSTing.
+Automatic monitoring is a first-class input alongside static JSON, so the system does not depend on someone manually POSTing.
 
 - **Simulator** (`scheduler/simulator.ts`): every `SIMULATOR_INTERVAL_MS`, generates observations for 4 named APIs and calls the monitoring service directly. Faults (slow, 500, 404, zero records, malformed) are injected at about 20% and **persist for a few ticks** so deduplication and auto-recovery are visible on the dashboard. Randomness is injectable and fault state resettable, so the lifecycle is unit-covered. Off by default (`SIMULATOR_ENABLED=false`); the compose stack turns it on explicitly for the demo.
 - **Static JSON:** `npm run ingest -- data/sample-api-responses.json` loads a file through the same service.
@@ -530,7 +529,7 @@ Kept to what is cheap and relevant:
 
 ## 22. Known Limitations (documented in the README)
 
-These are conscious scope decisions for the assessment:
+These are conscious scope decisions:
 
 - No heartbeat/staleness detection: an API that stops reporting is not flagged.
 - Global thresholds only; per-API thresholds are future work.
@@ -561,7 +560,7 @@ docker compose
 └── frontend
 ```
 
-`LLM_PROVIDER=none` by default, so reviewers can run the full system without an API key. Setting a key enables the AI path.
+`LLM_PROVIDER=none` by default, so operators can run the full system without an API key. Setting a key enables the AI path.
 
 ---
 

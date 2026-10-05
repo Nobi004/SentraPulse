@@ -138,7 +138,7 @@ describe("detectAnomalies", () => {
     ).toContain("MALFORMED_RESPONSE");
   });
 
-  it("brief example 5500+500+0 → 9 critical", () => {
+  it("reference example 5500+500+0 → 9 critical", () => {
     const r = detectAnomalies(
       {
         apiName: "AppointmentAPI",

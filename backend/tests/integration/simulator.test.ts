@@ -92,7 +92,7 @@ describe("simulator", () => {
     expect(await Alert.countDocuments({ status: "active" })).toBe(0);
   });
 
-  it("ingest path: brief sample file processes end to end", async () => {
+  it("ingest path: sample file processes end to end", async () => {
     const file = join(process.cwd(), "data", "sample-api-responses.json");
     const items = JSON.parse(readFileSync(file, "utf8"));
     const { summary } = await processBatch(items);

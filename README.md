@@ -85,7 +85,7 @@ Same routers at `/api/v1` and `/` — the brief's paths work as written.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/v1/health` | Liveness |
+| GET | `/api/v1/health` | Liveness + readiness (200 `connected`, 503 while DB unreachable) |
 | POST | `/api/v1/monitor` | Ingest one observation or a batch |
 | GET | `/api/v1/alerts` | List alerts. **Defaults to `status=active`.** |
 | PATCH | `/api/v1/alerts/:id/resolve` | Manual resolve |
@@ -125,11 +125,11 @@ working default.
 | `HIGH_RESPONSE_TIME_MS` / `VERY_HIGH_RESPONSE_TIME_MS` | `5000` / `10000` | Latency tiers (+2 / +3) |
 | `MAX_BATCH_SIZE` | `100` | Bigger batches → 400 |
 | `OBSERVATION_TTL_DAYS` | `30` | Observations expire via TTL |
-| `LLM_PROVIDER` | `none` | `none` \| `gemini` (only real provider; OpenAI = one new file) |
-| `GEMINI_API_KEY` | _(empty)_ | Missing key ⇒ fallback-only, never crashes |
+| `LLM_PROVIDER` | `none` | `none` \| `gemini` (live) \| `openai` (warns, falls back — not implemented) |
+| `GEMINI_API_KEY` / `OPENAI_API_KEY` | _(empty)_ | Missing key ⇒ fallback-only, never crashes |
 | `LLM_TIMEOUT_MS` / `LLM_CONCURRENCY` / `LLM_MAX_PER_REQUEST` | `5000` / `5` / `10` | Cost/latency bounds |
 | `INGEST_API_KEY` | _(empty)_ | If set, `POST /monitor` needs header `x-api-key` |
-| `SIMULATOR_ENABLED` / `SIMULATOR_INTERVAL_MS` | `true` / `15000` | Built-in traffic (faults persist a few ticks) |
+| `SIMULATOR_ENABLED` / `SIMULATOR_INTERVAL_MS` | `false` / `15000` | Compose sets `true` for the demo; bare servers stay quiet |
 
 ## Anomaly rules & severity
 

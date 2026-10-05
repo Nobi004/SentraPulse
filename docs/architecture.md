@@ -39,7 +39,7 @@ Microservices, queues/Kafka, Kubernetes, ML anomaly detection, per-API threshold
 | Backend | Node.js, Express, TypeScript, Mongoose, Zod, Winston |
 | Database | MongoDB |
 | Frontend | React, Vite, TypeScript, Tailwind CSS (plain `fetch`) |
-| AI | One real provider behind an `AlertGenerator` interface (Gemini or OpenAI) |
+| AI | One real provider behind an `AlertGenerator` interface: Gemini `gemini-3.5-flash-lite` via REST `fetch` (no SDK) |
 | Tests | Vitest, Supertest, mongodb-memory-server |
 | Tooling | Docker Compose, ESLint, Prettier |
 | Scheduling | `setInterval` (no extra dependency) |
@@ -319,7 +319,7 @@ interface AlertGenerationInput {
 }
 ```
 
-`createAlertGenerator()` reads `LLM_PROVIDER` and returns a generator, or `null` for `none` or a missing API key. `null` means fallback only; the app never crashes because of a missing key.
+`createAlertGenerator()` reads `LLM_PROVIDER` and returns a generator, or `null` for `none` or a missing API key. `null` means fallback only; the app never crashes because of a missing key. Any other provider value (e.g. `openai`, not implemented) logs `LLM_PROVIDER_NOT_IMPLEMENTED` and falls back. Provider HTTP failures log the status plus a short body excerpt (`AI_PROVIDER_ERROR`) and keep the fallback.
 
 ### 11.2 Why context matters
 
@@ -394,7 +394,7 @@ The same routers are mounted at `/api/v1` and at `/` so the paths in the brief (
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/v1/health` | Liveness |
+| GET | `/api/v1/health` | Liveness + readiness (200 `connected`, 503 `disconnected`; compose healthchecks it) |
 | POST | `/api/v1/monitor` | Ingest one observation or a batch |
 | GET | `/api/v1/alerts` | List alerts. **Defaults to `status=active`.** |
 | PATCH | `/api/v1/alerts/:id/resolve` | Manual resolve |
@@ -411,8 +411,8 @@ The same routers are mounted at `/api/v1` and at `/` so the paths in the brief (
 Validation is **lenient on purpose**: a monitoring system that receives broken data must flag it, not reject it.
 
 - Body level (400): not JSON, not an object/array, empty array, more than `MAX_BATCH_SIZE` items.
-- Item level:
-  - `api_name`: required string, max 64 chars, `^[A-Za-z0-9_.-]+$`. Otherwise the item is *rejected*. It is also sent to the LLM, so the constraint blocks prompt injection.
+- Item level (per-item `rejected` inside a 200 batch, rest continues):
+  - `api_name`: required string, max 64 chars, `^[A-Za-z0-9_.-]+$`. Missing key reasons `"api_name is required"`, any other violation reasons `"api_name is invalid"`. It is also sent to the LLM, so the constraint blocks prompt injection.
   - `response_time_ms`: finite number >= 0.
   - `status_code`: integer 100–599.
   - `records_returned`: integer >= 0.
@@ -444,7 +444,7 @@ AI_ALERT_GENERATED · AI_PROVIDER_ERROR · FALLBACK_ALERT_USED · DATABASE_ERROR
 
 The brief asks for automatic monitoring and allows static JSON input, so the system does not depend on someone manually POSTing.
 
-- **Simulator** (`scheduler/simulator.ts`, ~30 lines): every `SIMULATOR_INTERVAL_MS`, generates observations for 4–5 named APIs and calls `MonitoringService` directly. Faults (slow, 500, 404, zero records, malformed) are injected at about 20% and **persist for a few ticks** so deduplication and auto-recovery are visible on the dashboard. Enabled with `SIMULATOR_ENABLED=true`.
+- **Simulator** (`scheduler/simulator.ts`): every `SIMULATOR_INTERVAL_MS`, generates observations for 4 named APIs and calls the monitoring service directly. Faults (slow, 500, 404, zero records, malformed) are injected at about 20% and **persist for a few ticks** so deduplication and auto-recovery are visible on the dashboard. Randomness is injectable and fault state resettable, so the lifecycle is unit-covered. Off by default (`SIMULATOR_ENABLED=false`); the compose stack turns it on explicitly for the demo.
 - **Static JSON:** `npm run ingest -- data/sample-api-responses.json` loads a file through the same service.
 - **Manual:** `curl` / Postman against `/monitor`.
 
@@ -463,13 +463,13 @@ An operations dashboard, not an analytics tool.
 - **Stats cards:** monitored requests (24 h), active alerts, critical alerts, average response time.
 - **Filters:** severity, API name, status (active default / resolved / all).
 - **Alert table columns:** API, severity badge, status code, latency, records, **message with an "AI" or "Template" badge** (from `messageSource`), **occurrences**, last seen, status, resolve action.
-- **Behavior:** polls every 10 seconds; loading, empty, and error states; responsive layout.
+- **Behavior:** polls every 10 seconds; loading, empty, and error states; failed manual resolves show a dismissible error banner; responsive layout.
 
 ---
 
 ## 19. Configuration
 
-All configuration comes from environment variables; `.env.example` documents every one with working defaults, so `docker compose up` works with zero setup.
+All configuration comes from environment variables; `.env.example` documents every one with working defaults, so `docker compose up` works with zero setup. A root `.env` (gitignored, never committed) overrides compose secrets: only `LLM_PROVIDER`, `GEMINI_API_KEY`, `INGEST_API_KEY`, and `SIMULATOR_ENABLED` are read from it; infra wiring stays in `docker-compose.yml`. A missing file falls back to defaults.
 
 ```env
 NODE_ENV=development
@@ -483,7 +483,7 @@ VERY_HIGH_RESPONSE_TIME_MS=10000
 MAX_BATCH_SIZE=100
 OBSERVATION_TTL_DAYS=30
 
-LLM_PROVIDER=none          # none | gemini | openai (implement one)
+LLM_PROVIDER=none          # none | gemini (implemented) | openai (accepted, warns LLM_PROVIDER_NOT_IMPLEMENTED, falls back)
 GEMINI_API_KEY=
 OPENAI_API_KEY=
 LLM_TIMEOUT_MS=5000
@@ -491,7 +491,7 @@ LLM_CONCURRENCY=5
 LLM_MAX_PER_REQUEST=10
 
 INGEST_API_KEY=            # optional; if set, POST /monitor requires header x-api-key
-SIMULATOR_ENABLED=true
+SIMULATOR_ENABLED=false   # compose stack sets true explicitly for the demo
 SIMULATOR_INTERVAL_MS=15000
 ```
 

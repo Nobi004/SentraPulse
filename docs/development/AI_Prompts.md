@@ -4,7 +4,7 @@ Intelligent API Monitoring & Alert System · 5-day assessment deliverable
 
 Assistant: OpenCode coding agent, powered by Muse Spark (Meta).
 
-Per assessment section 9, this file documents every prompt used while building (code generation, prompt design, logic building) plus the runtime prompt shipped in the product. Mirror of `docs/AI_Prompts.docx`.
+Per assessment section 9, this file documents every prompt used while building (code generation, prompt design, logic building) plus the runtime prompt shipped in the product. Mirror of `docs/development/AI_Prompts.docx`.
 
 ## 1. How this log was produced
 

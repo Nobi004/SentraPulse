@@ -315,7 +315,7 @@ frontend/
 docs/
   architecture.md       system architecture reference
   adr/                  architecture decision records
-  AI_Prompts.md         development provenance (kept for history)
+  development/          development provenance (kept for history)
 ```
 
 ## Architecture Decisions
@@ -391,6 +391,6 @@ them pluggable without redesign.
 ## Contributing
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, workflow, and
-pull-request expectations. `docs/AI_Prompts.md` preserves the development
-history of this repository, including the runtime prompt shipped in
-`backend/src/ai/prompts.ts`.
+pull-request expectations. `docs/development/AI_Prompts.md` preserves the
+development history of this repository, including the runtime prompt
+shipped in `backend/src/ai/prompts.ts`.

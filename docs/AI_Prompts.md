@@ -48,6 +48,13 @@ Development ran as a human–AI loop over about 50 turns: the human gave short d
 - Model fix: switch to gemini-3.5-flash-lite and log the provider error body — verified live (messageSource ai, AI_ALERT_GENERATED).
 - Is everything merged to main? Push. Write this AI_Prompts file (docx, then this markdown mirror).
 
+### 2.5 Pre-submission senior audit (10-point brief, all test-driven)
+
+- Audit the repository as a senior engineer for assessment submission: architecture correctness, reliability, maintainability, coverage, docs, readiness — fix the 10 listed items, no new product features.
+- Go audit — delivered: Alert AI-patch routed through `alerts/alert.repository.ts` (`updateAlertMessage`); accurate reject reasons (`required` vs `invalid`); `LLM_PROVIDER_NOT_IMPLEMENTED` warn for the unconfigured `openai` value; simulator default `false` (compose still enables the demo) plus `stopSimulator()` and a drained SIGINT/SIGTERM shutdown; real readiness health (200 `connected` / 503 `disconnected`) plus a backend compose healthcheck; visible dismissible resolve-failure banner (also fixed test-DOM leakage from missing cleanup without vitest globals); clean ingest CLI errors; architecture.md/README drift sync; new GitHub Actions CI (backend lint/tsc/vitest, frontend lint/test/build).
+- Run-it runbooks and rerun cheat-sheets (compose, local-dev, and live-AI variants); diagnosed ECONNREFUSED/EBADNAME/closed-connection failures from pasted logs.
+- Model fix follow-through and pushes to `origin/main`; then update these prompt logs.
+
 ## 3. Runtime prompt (shipped product)
 
 Source: `backend/src/ai/prompts.ts` — PROMPT_VERSION v1. Sent to Gemini gemini-3.5-flash-lite (was gemini-1.5-flash until Oct 2026, retired by Google). Facts JSON appended per incident, sliced to 2000 chars; only anomaly facts are sent, never patient data; api_name charset/length rules double as prompt-injection guard.

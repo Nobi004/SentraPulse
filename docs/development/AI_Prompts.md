@@ -70,6 +70,14 @@ Development ran as a human–AI loop over about 50 turns: the human gave short d
 - Verified: backend `npm ci` + lint + `tsc` + 57/57 + build; frontend `npm ci` + lint + 12/12 + build; `docker compose build` and live `up` with health `connected` and a live AI incident.
 - Then updated these prompt logs (markdown + docx) to match.
 
+### 2.8 Final hygiene, release gate, and v1.0.0
+
+- Repository-hygiene pass: moved `AI_Prompts.*` to `docs/development/`, rewrote `SECURITY.md` for private vulnerability reporting, swept flagged terms (product files clean; only retained history and `candidates` false positives remain).
+- Release-gate audit (verification only): backend lint/tsc/57 tests/build, frontend lint/12 tests/build, `docker compose build` + healthy `up`, live smoke (healthy, critical, dedupe `count:2`, auto-recovery), quota-exhausted AI correctly falling back. Found and fixed one gap: CI lacked the backend build step.
+- Released v1.0.0: synced `main`, confirmed versions, re-verified gates, tagged annotated `v1.0.0` on `50679a3`, pushed the tag; `gh release create` blocked by token scope (403), release stays tag-only until published with a scoped token or the web UI.
+- Re-ran the release procedure later: refused to re-tag (guard: `v1.0.0` already exists locally and remotely on the same SHA), retried publication (same 403).
+- Then updated these prompt logs (markdown + docx) to match.
+
 ## 3. Runtime prompt (shipped product)
 
 Source: `backend/src/ai/prompts.ts` — PROMPT_VERSION v1. Sent to Gemini gemini-3.5-flash-lite (was gemini-1.5-flash until Oct 2026, retired by Google). Facts JSON appended per incident, sliced to 2000 chars; only anomaly facts are sent, never patient data; api_name charset/length rules double as prompt-injection guard.

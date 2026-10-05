@@ -1,5 +1,7 @@
 # SentraPulse — Intelligent API Monitoring & Alert System
 
+[![ci](https://github.com/Nobi004/SentraPulse/actions/workflows/ci.yml/badge.svg)](https://github.com/Nobi004/SentraPulse/actions/workflows/ci.yml)
+
 Monitors API telemetry, detects anomalies with **deterministic rules**, groups
 repeats into incidents, and uses an LLM to write a short human-readable
 explanation per incident — with a template fallback so monitoring stays
@@ -10,6 +12,35 @@ correct when the LLM is unavailable or wrong.
 Modular monolith: one Express backend, one MongoDB, one React dashboard.
 Full design: [`docs/architecture.md`](docs/architecture.md).
 
+```text
+API Telemetry
+     │
+     ▼
+POST /monitor
+     │
+     ▼
+Validation → Observation Store
+     │
+     ▼
+Deterministic Anomaly Engine
+     │
+     ├── Healthy → Auto-resolve
+     │
+     └── Anomaly
+            │
+            ▼
+      Incident/Deduplication
+            │
+            ▼
+       Gemini ──failure──► Template Fallback
+            │
+            ▼
+          Alerts
+            │
+            ▼
+      React Dashboard
+```
+
 ## Quick start (zero setup)
 
 ```bash
@@ -17,7 +48,7 @@ docker compose up --build
 ```
 
 - Dashboard: http://localhost:5173 (polls every 10s)
-- API: http://localhost:4000/api/v1 (aliases `/monitor`, `/alerts` also work)
+- API: http://localhost:4000/api/v1 (aliases `/monitor`, `/alerts`, `/stats` also work)
 - `LLM_PROVIDER=none` by default — full system runs with no API key.
 - The simulator (`SIMULATOR_ENABLED=true`) generates traffic so alerts appear.
 
@@ -27,7 +58,8 @@ One line still runs everything. Secrets live in the root `.env`
 (never committed — see `.gitignore`); missing file = defaults above.
 
 ```bash
-# enable live AI explanations (free key: https://aistudio.google.com/apikey)
+# enable live Gemini-generated explanations
+# obtain a Gemini API key from Google AI Studio
 # edit .env: LLM_PROVIDER=gemini, GEMINI_API_KEY=<key>
 docker compose up --build -d
 ```
@@ -81,7 +113,9 @@ npm run dev           # :5173, proxies /api → :4000
 
 ## REST API
 
-Same routers at `/api/v1` and `/` — the brief's paths work as written.
+Versioned APIs are exposed under `/api/v1`. Compatibility aliases
+(`/monitor`, `/alerts`, and `/stats`) are also provided so the endpoints
+specified in the assessment work as written.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -111,8 +145,14 @@ curl localhost:4000/api/v1/stats
 curl -X PATCH localhost:4000/api/v1/alerts/<id>/resolve
 ```
 
-Response envelope: `{ "success": true, "summary": {...}, "results": [...] }`
-(errors: `{ "success": false, "error": { "code", "message", "requestId" } }`).
+`POST /monitor` returns:
+
+`{ "success": true, "summary": {...}, "results": [...] }`
+
+`GET` endpoints return `{ "success": true, "data": ... }` (alerts add a
+`pagination` object). API errors use:
+
+`{ "success": false, "error": { "code", "message", "requestId" } }`
 
 ## Configuration
 
@@ -144,6 +184,27 @@ working default.
 
 Score → severity: `0 none`, `1–2 low`, `3–4 medium`, `5–7 high`, `8+ critical`.
 Severity is computed at first detection and never changed by the LLM.
+
+## Key Engineering Decisions
+
+**Rules detect; AI explains.** The LLM never decides whether an API is
+unhealthy or how severe an incident is. Those decisions are deterministic
+and testable.
+
+**Incidents, not alert spam.** Repeated observations with the same anomaly
+signature update one active incident instead of generating duplicate
+alerts or repeated LLM calls.
+
+**AI failure is non-critical.** Every alert receives a deterministic
+fallback message first. Gemini may replace it with a richer explanation,
+but provider failure never prevents alert creation.
+
+**Bounded AI usage.** Timeouts, concurrency limits, per-request caps, and
+deduplication keep LLM latency and cost bounded.
+
+**Store healthy observations too.** Historical observations support
+dashboard statistics, recent context for alert explanations, and future
+adaptive anomaly detection.
 
 ## Known limitations
 
@@ -180,6 +241,25 @@ One active alert per (API, incident signature)
   all mocked, no key needed; health readiness).
 - Frontend: `npm test` — 12 component tests (api client, badges, table,
   filters, 10s polling + unmount cleanup, resolve-failure banner).
+
+## Quality Gates
+
+Every push and pull request runs GitHub Actions for both applications
+(`.github/workflows/ci.yml`).
+
+**Backend**
+
+- dependency installation
+- ESLint
+- TypeScript type checking
+- 57 tests
+
+**Frontend**
+
+- dependency installation
+- ESLint
+- 12 tests
+- production build
 
 ## Submission
 

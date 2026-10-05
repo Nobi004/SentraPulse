@@ -450,9 +450,9 @@ The brief asks for automatic monitoring and allows static JSON input, so the sys
 
 ---
 
-## 17. Email (optional)
+## 17. Email notifications (deferred)
 
-Only if the core is finished. Send one email for each **newly created** alert with severity `high` or `critical`, never for updates. The send is wrapped in try/catch and can never fail ingestion. With SMTP unset, the transport logs the email to the console. If time is short, remove `notifications/` from the repo.
+Consciously out of scope: one email per new `high`/`critical` alert, never blocking ingestion. No `notifications/` module ships.
 
 ---
 
@@ -565,35 +565,7 @@ docker compose
 
 ---
 
-## 25. Implementation Sequence (vertical slice first)
-
-1. Scaffold, env config, Mongo connection, basic logger.
-2. Domain: detector, severity, signature, fallback message — with unit tests.
-3. `POST /monitor` → observations → alert upsert → `GET /alerts`. Verify with curl and the sample JSON.
-4. Basic dashboard table with polling.
-5. LLM integration: context, timeout, output validation.
-6. Auto-resolve, simulator, `/stats`, rate limit, optional API key.
-7. Docker Compose, README, `AI_Prompts.docx`, demo video.
-8. Email (only if on schedule).
-
-Steps 1–4 working end to end on day one makes the rest low-risk.
-
----
-
-## 26. Submission Checklist
-
-- [ ] GitHub repository (full project)
-- [ ] README: setup, run, env variables, endpoints, sample requests, known limitations
-- [ ] Video, 5–10 min: architecture, live workflow (simulator → alert → dedupe → recovery), key decisions
-- [ ] `AI_Prompts.docx`: every prompt used while building (code, logic, design) **plus** the runtime prompt from `prompts.ts`
-- [ ] Email with the GitHub link and the Drive link (video + prompts file)
-- [ ] Deadline: 5 days from the assignment date
-
-Keep a running log of prompts from day one; reconstructing them later is slow.
-
----
-
-## 27. Architectural Invariants
+## 25. Architectural Invariants
 
 ```text
 Detection ≠ Explanation

@@ -50,7 +50,7 @@ Backend:
 ```bash
 cd backend
 npm install
-npx vitest run        # 54 tests
+npx vitest run        # 57 tests
 npm run dev           # :4000 (needs MONGODB_URI, defaults to localhost)
 npm run ingest -- data/sample-api-responses.json
 ```
@@ -60,7 +60,7 @@ Frontend:
 ```bash
 cd frontend
 npm install
-npm test              # 10 component tests
+npm test              # 12 component tests
 npm run dev           # :5173, proxies /api → :4000
 ```
 
@@ -173,12 +173,13 @@ One active alert per (API, incident signature)
 
 ## Tests
 
-- Backend: `npx vitest run` — 54 tests (unit: detector boundaries incl.
+- Backend: `npx vitest run` — 57 tests (unit: detector boundaries incl.
   4999/5000/10000, severity map, signature, fallback, output validator;
-  integration: ingest, dedupe `count:2`, auto-resolve, stats, rate-limit,
-  api-key, LLM success/timeout/error/invalid/cap — all mocked, no key needed).
-- Frontend: `npm test` — 10 component tests (api client, badges, table,
-  filters, 10s polling + unmount cleanup).
+  integration: ingest incl. reject reasons, dedupe `count:2`, auto-resolve,
+  stats, rate-limit, api-key, LLM success/timeout/error/invalid/cap/factory —
+  all mocked, no key needed; health readiness).
+- Frontend: `npm test` — 12 component tests (api client, badges, table,
+  filters, 10s polling + unmount cleanup, resolve-failure banner).
 
 ## Submission
 

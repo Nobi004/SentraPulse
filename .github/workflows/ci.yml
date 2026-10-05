@@ -23,6 +23,8 @@ jobs:
         working-directory: backend
       - run: npx vitest run
         working-directory: backend
+      - run: npm run build
+        working-directory: backend
 
   frontend:
     runs-on: ubuntu-latest

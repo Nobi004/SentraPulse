@@ -55,6 +55,12 @@ Development ran as a human–AI loop over about 50 turns: the human gave short d
 - Run-it runbooks and rerun cheat-sheets (compose, local-dev, and live-AI variants); diagnosed ECONNREFUSED/EBADNAME/closed-connection failures from pasted logs.
 - Model fix follow-through and pushes to `origin/main`; then update these prompt logs.
 
+### 2.6 External review polish (README 9.2/10)
+
+- Applied a 6-item polish review: ASCII architecture diagram in README, exact versioned-vs-alias wording, three-way response-envelope docs, neutral Gemini-key wording (no pricing claims), Quality Gates section mirroring CI plus a status badge, and a Key Engineering Decisions section.
+- Cleaned `architecture.md` for submission: Email section reduced to a deferred note, Implementation Sequence and Submission Checklist removed (old §27 invariants renumbered to §25, no dangling cross-references).
+- Then updated these prompt logs (markdown + docx) to match.
+
 ## 3. Runtime prompt (shipped product)
 
 Source: `backend/src/ai/prompts.ts` — PROMPT_VERSION v1. Sent to Gemini gemini-3.5-flash-lite (was gemini-1.5-flash until Oct 2026, retired by Google). Facts JSON appended per incident, sliced to 2000 chars; only anomaly facts are sent, never patient data; api_name charset/length rules double as prompt-injection guard.

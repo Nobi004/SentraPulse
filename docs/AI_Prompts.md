@@ -61,6 +61,15 @@ Development ran as a human–AI loop over about 50 turns: the human gave short d
 - Cleaned `architecture.md` for submission: Email section reduced to a deferred note, Implementation Sequence and Submission Checklist removed (old §27 invariants renumbered to §25, no dangling cross-references).
 - Then updated these prompt logs (markdown + docx) to match.
 
+### 2.7 Assessment-to-product refactor (no core redesign)
+
+- Refactor the repository from assessment submission into a reusable, production-minded modular monolith: no new infrastructure, no behavior changes.
+- Removed assessment language (README Submission section, 5-day/deadline/brief/reviewer wording, assignment PDF); kept development history (`AI_Prompts.*`, `docs/superpowers/`) intentionally.
+- Rewrote README to the product structure (Why, Architecture, Core Features, Anomaly Model, Incident Lifecycle, AI Architecture, Security, Roadmap, Contributing) and retitled `architecture.md` to SentraPulse System Architecture.
+- Added `docs/adr/0001–0005` (monolith, deterministic detection, LLM-explains, signature dedupe, template fallback), ISC `LICENSE` (matches declared choice), `CONTRIBUTING.md`, `SECURITY.md`.
+- Verified: backend `npm ci` + lint + `tsc` + 57/57 + build; frontend `npm ci` + lint + 12/12 + build; `docker compose build` and live `up` with health `connected` and a live AI incident.
+- Then updated these prompt logs (markdown + docx) to match.
+
 ## 3. Runtime prompt (shipped product)
 
 Source: `backend/src/ai/prompts.ts` — PROMPT_VERSION v1. Sent to Gemini gemini-3.5-flash-lite (was gemini-1.5-flash until Oct 2026, retired by Google). Facts JSON appended per incident, sliced to 2000 chars; only anomaly facts are sent, never patient data; api_name charset/length rules double as prompt-injection guard.
